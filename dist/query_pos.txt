@@ -1,0 +1,7 @@
+SELECT TOP (5000) ls.*
+FROM [Cursor].[dbo].[Tender] t (nolock)
+join [Cursor].[dbo].Lot l (nolock) on t.Tender_ID=l.Tender_ID
+join [Cursor].[dbo].LotSpec ls (nolock) on l.Lot_ID=ls.Lot_ID
+
+where len(t.NotifNr) = 7 and ls.UPDDATE < '20201016'  and LS_MNN_ID is not null and LS_TradeNm_ID is not null
+order by t.SYSDATE desc
