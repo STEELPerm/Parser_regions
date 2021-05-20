@@ -46,11 +46,12 @@ def load_orgs(login_sql, password_sql, isDebug=True, isProxy=True):
         if version == 1:
             for i in range(0, 10):
                 while isnotdone == True:
+                    proxy = ''
                     # try:
-                    proxy = df_proxies.sample(1)['proxy'].reset_index(drop=True)[
-                        0]  # Берем один рандомный прокси из DataFrame
                     print('Попытка №' + str(i + 1))
                     if isProxy == True:
+                        proxy = df_proxies.sample(1)['proxy'].reset_index(drop=True)[
+                            0]  # Берем один рандомный прокси из DataFrame
                         print('Подключаюсь, используя прокси: ' + str(proxy))
                         prox = str(proxy).replace(' ', '')
                         proxies = {'http': 'http://' + prox, 'https': 'http://' + prox, }
@@ -85,7 +86,11 @@ def load_orgs(login_sql, password_sql, isDebug=True, isProxy=True):
                                     print('Connection timeout')
                                     isError = True
                             else:
-                                r = requests.post(url, headers=headers, verify=False)
+                                try:
+                                    r = requests.post(url, headers=headers, verify=False,timeout=50)
+                                except requests.exceptions.Timeout as e:
+                                    print('Connection timeout')
+                                    isError = True
 
                             parsed_html = BeautifulSoup(r.text, features="html.parser")
                             try:

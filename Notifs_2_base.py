@@ -33,7 +33,7 @@ def load_to_base(login_sql, password_sql, isDebug=True):
         mtd_withouts.append(row[5])
     conn_med.close()
 
-    notifs_import_query1 = "SELECT rn.* FROM [CursorImport].[import].[Regional_Notif] rn(nolock) left join [Cursor].dbo.Tender t (nolock) on rn.NotifNr=t.NotifNr left join [Cursor].log.DeletedTenders dt (nolock) on rn.NotifNr=dt.NotifNr where t.Tender_ID is null and (dt.id is null or (dt.id is null and rn.SYSDATE > dt.DDeleting))"
+    notifs_import_query1 = "SELECT rn.*, month(dateadd(month,1,rn.TendDt)) as PlanT_ID, year(dateadd(month,1,rn.TendDt)) as PlanTYear, dateadd(month,1,rn.TendDt) as SupplyDt FROM [CursorImport].[import].[Regional_Notif] rn(nolock) left join [Cursor].dbo.Tender t (nolock) on rn.NotifNr=t.NotifNr left join [Cursor].log.DeletedTenders dt (nolock) on rn.NotifNr=dt.NotifNr where t.Tender_ID is null and (dt.id is null or (dt.id is null and rn.SYSDATE > dt.DDeleting))"
     notifs_import = parser_utils.select_query(notifs_import_query1, login_sql, password_sql)
 
     for index0, row in notifs_import.iterrows():
@@ -59,6 +59,11 @@ def load_to_base(login_sql, password_sql, isDebug=True):
         tendtend = row['TendEndDt']
         contractplanned = row['ContractPlannedDt']
         fz_id = row['FZ_ID_import']
+
+        #STEEL от 19.04.2021 Заполнение периода и года поставки: берем месяц, следующий (+1) из даты проведения.
+        PlanT_ID = row['PlanT_ID']
+        PlanTYear = row['PlanTYear']
+        SupplyDt = row['SupplyDt']
 
         lotnm = lot_import['LotNm'][0]
         pricestart = lot_import['PriceStart'][0]
@@ -112,9 +117,9 @@ def load_to_base(login_sql, password_sql, isDebug=True):
         cursor.execute(
             "declare @tender_id int; Select @tender_id = Tender_id FROM [Cursor].[dbo].[Tender] where NotifNr = '" + str(
                 notifnr) + "'; "
-                           "insert into [Cursor].[dbo].[Lot](Tender_ID, Pos, LotNr, LotNm, PriceStart, Reg_ID, ConsigneeNm, ConsigneeInfo, SYSDATE, isAutomate, isAutomateWinner, LotStatus, Consignee_ID, UserID, OwnerID, ClaimObesp, ContrObesp) "
-                           "values (@tender_id, 1, 1, ?, ?, ?, ?, ?, getdate(), 1, 0, ?, ?, 'FDA506B0-2F4C-49F4-864F-836731C63391', 'FDA506B0-2F4C-49F4-864F-836731C63391', 0.0, 0.0) ",
-            lotnm, pricestart, int(regid), custnm, custaddr, int(statusid), cust_id)
+                           "insert into [Cursor].[dbo].[Lot](Tender_ID, Pos, LotNr, LotNm, PriceStart, Reg_ID, ConsigneeNm, ConsigneeInfo, SYSDATE, isAutomate, isAutomateWinner, LotStatus, Consignee_ID, UserID, OwnerID, ClaimObesp, ContrObesp, SupplyDt, PlanT_ID, PlanTYear) "
+                           "values (@tender_id, 1, 1, ?, ?, ?, ?, ?, getdate(), 1, 0, ?, ?, 'FDA506B0-2F4C-49F4-864F-836731C63391', 'FDA506B0-2F4C-49F4-864F-836731C63391', 0.0, 0.0, ?, ?, ?) ",
+            lotnm, pricestart, int(regid), custnm, custaddr, int(statusid), cust_id, SupplyDt, PlanT_ID, PlanTYear)
         if isDebug == False:
             conn.commit()
         conn.close()

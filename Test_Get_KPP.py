@@ -24,4 +24,8 @@ def get_KPP(query):
     #print(ln)
 
 
-get_KPP('5610048595')
+#get_KPP('5610048595')
+
+tenddt = '11.03.2021'
+
+print(tenddt)

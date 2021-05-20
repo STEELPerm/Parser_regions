@@ -42,10 +42,10 @@ def load_notifs_to_import(login_sql, password_sql, t2, isArgs=False, args_to_par
         for i in range(0, 10):
             while isnotdone == True:
                 # try:
-                proxy = df_proxies.sample(1)['proxy'].reset_index(drop=True)[
-                    0]  # Берем один рандомный прокси из DataFrame
                 print('Попытка №' + str(i + 1))
                 if isProxy == True:
+                    proxy = df_proxies.sample(1)['proxy'].reset_index(drop=True)[
+                        0]  # Берем один рандомный прокси из DataFrame
                     print('Подключаюсь, используя прокси: ' + str(proxy))
                     prox = str(proxy).replace(' ', '')
                     proxies = {'http': 'http://' + prox, 'https': 'http://' + prox, }
@@ -99,13 +99,18 @@ def load_notifs_to_import(login_sql, password_sql, t2, isArgs=False, args_to_par
                                             print('Connection timeout')
                                             isError = True
                                     else:
-                                        r = requests.get(url, headers=headers, verify=False)
+                                        try:
+                                            r = requests.get(url, headers=headers, verify=False, timeout=120)
+                                        except requests.exceptions.Timeout as e:
+                                            print('Connection timeout')
+                                            isError = True
                                     if isError == False:
                                         #print(version)
 
                                         if version == 1:
                                             try:
-                                                table1 = pd.read_html(r.text)[1]  # Тендер
+                                                table1 = pd.read_html(r.text.replace(',00', ''))[1]  # Тендер
+                                                #table1 = pd.read_html(r.text)[1]  # Тендер
                                                 table2 = pd.read_html(r.text)[2]  # Наименования колонок позиций
                                                 table3 = pd.read_html(str(r.text).replace(',', '.'))[3]  # Сами позиции
                                                 table3.columns = table2.columns
@@ -122,7 +127,9 @@ def load_notifs_to_import(login_sql, password_sql, t2, isArgs=False, args_to_par
                                             # print(str(r.text).replace(',', '.'))
                                             # table3.to_excel('test_pos1.xlsx')
                                             # print(table3);time.sleep(60)
+                                            #print(r.text.re.sub('\d[,]\d', '\d[.]\d', r.text, count=0))
                                             #print(table1);print(len(table1))
+                                            # sys.exit()
                                             RNPlanGraphNum = None
 
                                             #если есть раздел документы закупки номер должен уйти на ручной ввод, если имеем только объект закупки номер вводим автоматом
@@ -130,10 +137,6 @@ def load_notifs_to_import(login_sql, password_sql, t2, isArgs=False, args_to_par
                                                 havedocs = 1
                                             else:
                                                 havedocs = 0
-
-                                            #print(len(table1))
-                                            #print(table1)
-                                            #sys.exit()
 
                                             contractDt = None
                                             if len(table1) == 12:
@@ -452,6 +455,12 @@ def load_notifs_to_import(login_sql, password_sql, t2, isArgs=False, args_to_par
                                         except:
                                             pass
 
+                                        #print(str(tendNm), price, str(deliverPlace), reg_id_fin, str(tendStatus),status_fin, deliverDt)
+                                        #print(publDt, tendEnd, contractDt, url, str(notif), cust, str(org_cust),str(deliverDt), str(tendNm),
+                                        #      price, payment, descr, str(site_id),uniqueId, fz_id)
+                                        #sys.exit()
+
+
                                         if isArgs == True:  # Если перезаливка - удаляем извещения с импорта
                                             conn = pyodbc.connect('Driver={SQL Server Native Client 11.0};'
                                                                   'Server=37.203.243.65\CURSORMAIN,49174;'
@@ -475,10 +484,6 @@ def load_notifs_to_import(login_sql, password_sql, t2, isArgs=False, args_to_par
                                                 conn.commit()
                                             conn.close()
                                         print('Закачиваем извещение: ', notif)
-
-                                        #print(str(tendNm), price, str(deliverPlace), reg_id_fin, str(tendStatus), status_fin,deliverDt)
-                                        #print(publDt, tendEnd, contractDt, url, str(notif), cust, str(org_cust), str(deliverDt), str(tendNm), price,payment,descr,str(site_id), uniqueId, fz_id)
-                                        #sys.exit()
 
 
                                         conn = pyodbc.connect('Driver={SQL Server Native Client 11.0};'

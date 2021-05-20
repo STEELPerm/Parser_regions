@@ -28,10 +28,11 @@ def find_notifs(login_sql, password_sql, word_to_parse, date_to_parse, pages=Non
                 # try:
                 #time.sleep(2)
                 time.sleep(1)
-                proxy = df_proxies.sample(1)['proxy'].reset_index(drop=True)[
-                    0]  # Берем один рандомный прокси из DataFrame
+                proxy = ''
                 print('Попытка №' + str(i + 1))
                 if isProxy == True:
+                    proxy = df_proxies.sample(1)['proxy'].reset_index(drop=True)[
+                        0]  # Берем один рандомный прокси из DataFrame
                     print('Подключаюсь, используя прокси: ' + str(proxy))
                     prox = str(proxy).replace(' ', '')
                     proxies = {'http': 'http://' + prox, 'https': 'http://' + prox, }
@@ -57,8 +58,6 @@ def find_notifs(login_sql, password_sql, word_to_parse, date_to_parse, pages=Non
                     #print(referer)
                     print('Сейчас обрабатывается: ', site)
 
-
-
                     headers = {'Accept': '*/*', 'Host': host, 'Connection': 'keep-alive',
                                'XXX-TenantId-Header': tenant_id, 'Referer': refererAll,
                                'Content-type': 'application/json; charset=UTF-8',
@@ -79,13 +78,12 @@ def find_notifs(login_sql, password_sql, word_to_parse, date_to_parse, pages=Non
                                 print('Connection timeout')
                                 isError = True
                         else:
-                            #print('noProx')
-                            #print(url)
                             try:
-                                r = requests.post(url, data=json.dumps(payload), headers=headers, verify=False)
+                                r = requests.post(url, data=json.dumps(payload), headers=headers, verify=False, timeout=50)
                             except requests.exceptions.Timeout as e:
                                 print('Connection timeout')
                                 isError = True
+                                i0 = TotalPages + 1
 
                         try:
                             if isError == False:
@@ -118,8 +116,6 @@ def find_notifs(login_sql, password_sql, word_to_parse, date_to_parse, pages=Non
                                         customer_id = None
 
 
-
-
                                     df_tenders_in_base2 = df_tenders_in_base['Local_Notif_ID'][
                                         df_tenders_in_base['RegSite_ID'].isin([reg_site_id])].values.tolist()
 
@@ -145,7 +141,11 @@ def find_notifs(login_sql, password_sql, word_to_parse, date_to_parse, pages=Non
                                                     print('Connection timeout')
                                                     isError = True
                                             else:
-                                                r1 = requests.post(url1, headers=headers1, verify=False)
+                                                try:
+                                                    r1 = requests.post(url1, headers=headers1, verify=False,timeout=50)
+                                                except requests.exceptions.Timeout as e:
+                                                    print('Connection timeout')
+                                                    isError = True
 
                                             parsed_html1 = BeautifulSoup(r1.text, features="html.parser")
 
@@ -226,6 +226,7 @@ def find_notifs(login_sql, password_sql, word_to_parse, date_to_parse, pages=Non
 
                                 i0 += 1
                             else:
+                                isnotdone = False
                                 break
                         except:
                             print('Ошибка при работе с json')

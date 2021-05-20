@@ -1,6 +1,7 @@
 import requests
 import pandas as pd
 import os
+import sys
 import pyodbc
 import time
 from bs4 import BeautifulSoup
@@ -109,15 +110,18 @@ def price_cleaner(price_string):
     price_fin = price_string.lower().split(' руб')[0].replace(' ','').split(',')[0]
     if parser_utils.is_number(price_fin) == False:
         price_fin = price_string.split(' (')[0].replace(' ','').split(',')[0]
+        if parser_utils.is_number(price_fin) == False:
+            price_fin = None
     return price_fin
 
 def get_protocols(login_sql, password_sql, isDebug=True, isProxy=True, args=None):
     path = parser_utils.get_list_from_txt('path.txt')[0]
 
-    df_proxy = parser_utils.get_proxies(login_sql, password_sql)
-    print(df_proxy.sample(1))
+    if isProxy == True:
+        df_proxy = parser_utils.get_proxies(login_sql, password_sql)
+        print(df_proxy.sample(1))
     if args == None:
-        reg_sites_query = "SELECT id FROM [CursorImport].[import].[RegionalWebsites] where Host = 'zmo-new-webapi.rts-tender.ru'"
+        reg_sites_query = "SELECT id FROM [CursorImport].[import].[RegionalWebsites] where Host = 'zmo-new-webapi.rts-tender.ru'" # where Host = 'zmo-new-webapi.rts-tender.ru'
     else:
         reg_sites_query = "SELECT TOP(1) id FROM [CursorImport].[import].[RegionalWebsites] where Host = 'zmo-new-webapi.rts-tender.ru'"
     df_reg_site = parser_utils.select_query(reg_sites_query, login_sql, password_sql)
@@ -129,10 +133,14 @@ def get_protocols(login_sql, password_sql, isDebug=True, isProxy=True, args=None
 
         # while isnotdone == True:
         # try:
-        proxy = df_proxy.sample(1)['proxy'].reset_index(drop=True)[0]  # Берем один рандомный прокси из DataFrame
-        print('Подключаюсь, используя прокси: ' + str(proxy))
-        prox = str(proxy).replace(' ', '')
-        proxies = {'http': 'http://' + prox, 'https': 'http://' + prox, }
+        if isProxy == True:
+            proxy = df_proxy.sample(1)['proxy'].reset_index(drop=True)[0]  # Берем один рандомный прокси из DataFrame
+            print('Подключаюсь, используя прокси: ' + str(proxy))
+            prox = str(proxy).replace(' ', '')
+            proxies = {'http': 'http://' + prox, 'https': 'http://' + prox, }
+        else:
+            print('Подключаюсь, без прокси')
+
 
         if args == None:
             # запрос из текстового файла
@@ -140,27 +148,45 @@ def get_protocols(login_sql, password_sql, isDebug=True, isProxy=True, args=None
                 t = f.read().split('\r\n')
                 ' '.join(t)
                 df_tenders_query1 = t[0].replace('\n', ' ')
+
+                if "where" in df_tenders_query1:
+                    df_tenders_query1 = df_tenders_query1 + " and RegSite_ID=" + reg_site_id0
+                else:
+                    df_tenders_query1 = df_tenders_query1 + " where RegSite_ID=" + reg_site_id0
             # df_tenders_query1 = "SELECT rc.* FROM [CursorImport].[import].[RegionalCommon] rc join [CursorImport].[import].Regional_Notif rn on rc.Local_Notif_ID=rn.NotifNr join [Cursor].dbo.Tender t on rn.NotifNr=t.NotifNr join [Cursor].dbo.Lot l on t.Tender_ID=l.Tender_ID where TypeReasonFail_ID is null and Winner_ID is null and rc.RegSite_ID = " + reg_site_id0
         else:
             print(args)
-            df_tenders_query1 = "SELECT rc.* FROM [CursorImport].[import].[RegionalCommon] rc where Local_Notif_ID in " + str(args).replace('[','(').replace(']',')')
+            df_tenders_query1 = "SELECT rc.*, W.Referer, W.descr, W.Version FROM [CursorImport].[import].[RegionalCommon] rc left join [CursorImport].[import].[RegionalWebsites] W on rc.RegSite_ID=W.ID where Local_Notif_ID in " + str(args).replace('[','(').replace(']',')')
         df_tenders = parser_utils.select_query(df_tenders_query1, login_sql, password_sql, 'CursorImport')
-        # print(df_tenders) 1910895
-
-        df_sites_query = "select * FROM [CursorImport].[import].[RegionalWebsites] where id = " + reg_site_id0
-        df_sites = parser_utils.select_query(df_sites_query, login_sql, password_sql, 'CursorImport')
+        #print(df_tenders)
+        #sys.exit()
 
         i = 0
-        referer = df_sites['Referer'][i]
-        site = df_sites['descr'][i]
-        site_id = df_sites['id'][i]
-        print('Сейчас обрабатывается: ', site)
+
+        #df_sites_query = "select * FROM [CursorImport].[import].[RegionalWebsites] where id = " + reg_site_id0
+        #df_sites = parser_utils.select_query(df_sites_query, login_sql, password_sql, 'CursorImport')
+
         if df_tenders.empty == True:
             isnotdone = False
             print('По этому региону нет новых протоколов')
         else:
+            referer = df_tenders['Referer'][0]
+            site = df_tenders['descr'][0]
+            version = df_tenders['Version'][0]
+            # site_id = df_tenders['id'][i]
+            print('Сейчас обрабатывается: ', site)
+
             for id0, row in df_tenders.iterrows():
+
+                #Взять настройки сайта
+                #referer = row['Referer']
+                #site = row['descr']
+                #site_id = row['RegSite_ID']
+                #version = row['Version']
+
+                #print('Сейчас обрабатывается: ', site)
                 print(site, ':', id0, '/', len(df_tenders))
+
                 for i in range(0, 10):
                     print('Попытка №' + str(i + 1))
                     try:
@@ -208,40 +234,54 @@ def get_protocols(login_sql, password_sql, isDebug=True, isProxy=True, args=None
                             r = requests.get(url, headers=headers, verify=False)
                         # print(r);time.sleep(60)
                         if isError == False:
-                            try:
-                                table1 = pd.read_html(r.text)[0]   #STEEL от 24.11.2020 Заголовок с данными в таблице 0
-                                #table1 = pd.read_html(r.text)[1]  # Тендер
-                            except:
-                                table1 = pd.read_html(r.text)[2]  # Тендер
-                            # table3.to_excel('test_pos1.xlsx');print(table2);time.sleep(60)
-                            # print(table1);print(len(table1))
 
-                            print(table1)
+                            #Получение статуса в зависимости от площадки
+                            if version == 1:
+                                try:
+                                    #table1 = pd.read_html(r.text)[0]   #STEEL от 24.11.2020 Заголовок с данными в таблице 0
+                                    table1 = pd.read_html(r.text)[1]  # Тендер
+                                except:
+                                    table1 = pd.read_html(r.text)[2]  # Тендер
+                                # table3.to_excel('test_pos1.xlsx');print(table2);time.sleep(60)
+                                # print(table1);print(len(table1))
 
-                            # STEEL от 24.11.2020 Заголовок с данными в таблице 0
-                            tendStatus = None
-                            if tendStatus == None:
-                                for st in range(len(table1)):
-                                    if table1[0][st] == 'Статус':
-                                        tendStatus = table1[1][st]
+                                tendStatus = None
+                                if tendStatus == None:
+                                    for st in range(len(table1)):
+                                        if table1[0][st] == 'Статус':
+                                            tendStatus = table1[1][st]
 
-                            elif len(table1) == 12:
-                                uniqueId = None
-                                tendNm = table1[1][0]
-                                tendStatus = table1[1][1]
-                            elif len(table1) == 13:
-                                if table1[0][0] != 'Наименование':
-                                    uniqueId = table1[1][0]
-                                    tendNm = table1[1][1]
-                                    tendStatus = table1[1][2]
-                                else:
+                                elif len(table1) == 12:
                                     uniqueId = None
                                     tendNm = table1[1][0]
                                     tendStatus = table1[1][1]
-                            else:
-                                uniqueId = table1[1][0]
-                                tendNm = table1[1][1]
-                                tendStatus = table1[1][2]
+                                elif len(table1) == 13:
+                                    if table1[0][0] != 'Наименование':
+                                        uniqueId = table1[1][0]
+                                        tendNm = table1[1][1]
+                                        tendStatus = table1[1][2]
+                                    else:
+                                        uniqueId = None
+                                        tendNm = table1[1][0]
+                                        tendStatus = table1[1][1]
+                                else:
+                                    uniqueId = table1[1][0]
+                                    tendNm = table1[1][1]
+                                    tendStatus = table1[1][2]
+
+                                #print(tendStatus)
+                                #sys.exit()
+                            if version == 2:
+                                parsed_html1 = BeautifulSoup(r.text, features="html.parser")
+
+                                tendStatus = \
+                                    str(parsed_html1).split(
+                                        '<p class="currentStatus active">')[1].split('</p>')[
+                                        0].replace(
+                                        '\r', '').replace('\n', '').replace('</span>', '').replace('<span>Статус: ', '')
+
+                            #print(tendStatus)
+                            #sys.exit()
 
                             if 'отменен' in tendStatus.lower():
                                 prot_num = 0
@@ -257,8 +297,15 @@ def get_protocols(login_sql, password_sql, isDebug=True, isProxy=True, args=None
                                 insert_prots_query(notif_id, notif, why_not, main_stat, prot_num, Winner, Winner_ID,
                                                    Winner_price, Winner_decision, login_sql, password_sql, Debug=isDebug)
                                 print(tendStatus)
-                            else:
+                            #STEEL от 08.04.2021 Если статус "Договор не заключён", то причина: Отказ от заключения контракта (для московской обл.)
+                            elif 'оговор не заключ' in tendStatus.lower():
+                                prot_num = 0
+                                why_not = "Отказ от заключения контракта"
+                                main_stat = 'ОПРЕДЕЛЕНИЕ ПОСТАВЩИКА ЗАВЕРШЕНО'
+                                insert_prots_query(notif_id, notif, why_not, main_stat, prot_num, Winner, Winner_ID,
+                                                   Winner_price, Winner_decision, login_sql, password_sql, Debug=isDebug)
                                 print(tendStatus)
+                            else:
                                 clear_winword_process()
                                 try:
                                     os.remove('0.docx')
@@ -268,23 +315,31 @@ def get_protocols(login_sql, password_sql, isDebug=True, isProxy=True, args=None
                                     os.remove('0.rtf')
                                 except:
                                     pass
-                                soup = BeautifulSoup(r.text, 'lxml')
-                                data_scripts = []
-                                data = soup.find_all('script', type='text/javascript')  # берем предпоследний скрипт
-                                for data0 in data:
-                                    data1 = str(data0).replace('            ', '')
-                                    data_split = data1.split('\n')  # Делим на строки
-                                    data_scripts.append(data_split)
+
                                 files = []
                                 urls = []
-                                for data2 in data_scripts:
-                                    for spl in data2:  # Находим в строках соответствие
-                                        if 'filename' in spl.lower():
-                                            files.append(spl.lower())
-                                        if ' url:' in spl.lower():
-                                            urls.append(spl.lower())
-                                # print(files)
-                                # print(urls)
+
+                                #Достаём файлы
+                                if version == 1:
+                                    soup = BeautifulSoup(r.text, 'lxml')
+                                    data_scripts = []
+                                    data = soup.find_all('script', type='text/javascript')  # берем предпоследний скрипт
+                                    for data0 in data:
+                                        data1 = str(data0).replace('            ', '')
+                                        data_split = data1.split('\n')  # Делим на строки
+                                        data_scripts.append(data_split)
+
+                                    for data2 in data_scripts:
+                                        for spl in data2:  # Находим в строках соответствие
+                                            if 'filename' in spl.lower():
+                                                files.append(spl.lower())
+                                            if ' url:' in spl.lower():
+                                                urls.append(spl.lower())
+
+                                #print(files)
+                                #print(urls)
+                                #sys.exit()
+
                                 Found = False
                                 isrtf = False
                                 for url, file in zip(urls, files):
@@ -324,6 +379,9 @@ def get_protocols(login_sql, password_sql, isDebug=True, isProxy=True, args=None
                                                     if cell.text:
                                                         df[i][j] = cell.text
                                             tables.append(pd.DataFrame(df))
+                                        #print(tables)
+                                        print(len(tables))
+                                        print(find_index_by_str(tables[3], 'Порядковый номер заявки', 1)[0] )
                                         winners_df = tables[0]  # Берем первую таблицу и редактируем
                                         winners_df.columns = winners_df.iloc[0]
                                         winners_df = winners_df.iloc[1:]
@@ -368,6 +426,11 @@ def get_protocols(login_sql, password_sql, isDebug=True, isProxy=True, args=None
                                                        Winner_price, Winner_decision, login_sql, password_sql, Debug=isDebug)
                                     print('Документ протокола не найден')
                                     isnotdone = False
+
+                                print(winners_df)
+                                sys.exit()
+
+
                                 if winners_df is not None:
                                     for ind1, row in winners_df.iterrows():
                                         if 'не опред' in row[winners_df.columns[4]].lower() or 'побед' in row[

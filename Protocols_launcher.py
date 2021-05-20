@@ -8,7 +8,7 @@ import Parser_protocols
 
 sql_login_file = 'login_sql.txt'
 
-Debug = True  # дебаг, если True - вкл, False - выкл
+Debug = False  # дебаг, если True - вкл, False - выкл
 Proxy = False  # прокси, если True - вкл, False - выкл
 
 
