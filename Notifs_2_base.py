@@ -42,7 +42,8 @@ def load_to_base(login_sql, password_sql, isDebug=True):
         id_notif = row['Notif_ID']
 
         # Забираем лот из импорта
-        lot_import_query = "SELECT * FROM [CursorImport].[import].[Regional_Lot] where Notif_ID = " + str(id_notif)
+        #lot_import_query = "SELECT * FROM [CursorImport].[import].[Regional_Lot] where Notif_ID = " + str(id_notif)
+        lot_import_query = "SELECT *, isnull((select RegCode from [cursor].dbo.Org where Org_ID = (select Org_ID from [CursorImport].[import].[Regional_Notif] where Notif_ID=L.Notif_ID)),L.Reg_ID) as Reg_ID_Cust FROM [CursorImport].[import].[Regional_Lot] L where Notif_ID = " + str(id_notif)
         lot_import = parser_utils.select_query(lot_import_query, login_sql, password_sql)
 
         # Проставляем переменные для закачки в базу
@@ -68,7 +69,11 @@ def load_to_base(login_sql, password_sql, isDebug=True):
         lotnm = lot_import['LotNm'][0]
         pricestart = lot_import['PriceStart'][0]
         deliveryplace = lot_import['DeliveryPlace'][0]
-        regid = lot_import['Reg_ID'][0]
+
+        #STEEL от 31.05.2021 взять регион из организации
+        #regid = lot_import['Reg_ID'][0]
+        regid = lot_import['Reg_ID_Cust'][0]
+
         statusid = lot_import['LotStatus_ID'][0]
         if statusid == None:
             statusid = 5
@@ -99,7 +104,7 @@ def load_to_base(login_sql, password_sql, isDebug=True):
         cursor = conn.cursor()
         cursor.execute(
             "insert into [Cursor].[dbo].[Tender](ProcDt, PublDt, SrcInf, NotifNr, TendNr, StatusT_ID, FormT_ID, Reg_ID, ProviderT_ID, TenderDocReglament, Cust_ID, ClaimReglament, ClaimDtBeg, ClaimDtEnd, TendDt, TendNm, TenderPrice, Lot, ContrPrice, ContrPriceMax, PaymentReglament, ObespPerc, ObespSum, IsDraft, SYSDATE, LotCount, SpecCount, ImportType, isAutomate, UserID, OwnerID, Budget, BudgetProg_FK, Planned, FZ_ID) "
-            "values (getdate(), ?, ?, ?, 'Б/н', ?, ?, ?, ?, 'Средства учреждений', ?, 'rts-tender.ru', ?, ?, ?, ?, ?, '1', 0.0, 0.0, ?, 0.0, 0.0, 0, getdate(), 1, 0, 18, 1, 'FDA506B0-2F4C-49F4-864F-836731C63391', 'FDA506B0-2F4C-49F4-864F-836731C63391', 'X', 7, 0, ?) ",
+            "values (getdate(), ?, ?, ?, 'Б/н', ?, ?, ?, ?, 'Средства учреждений', ?, 'rts-tender.ru', ?, ?, ?, ?, ?, '1', 0.0, 0.0, ?, 0.0, 0.0, 0, getdate(), 1, 0, 18, 1, 'FDA506B0-2F4C-49F4-864F-836731C63391', 'FDA506B0-2F4C-49F4-864F-836731C63391', 'U', 7, 0, ?) ",
             publdt, url, notifnr, int(statusid), auction_type, int(regid), cust_id, cust_id, tenddt, tendtend, tenddt,
             tendnm, tenderprice, condition, fz_id)
         if isDebug == False:

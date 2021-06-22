@@ -380,8 +380,8 @@ def get_protocols(login_sql, password_sql, isDebug=True, isProxy=True, args=None
                                                         df[i][j] = cell.text
                                             tables.append(pd.DataFrame(df))
                                         #print(tables)
-                                        print(len(tables))
-                                        print(find_index_by_str(tables[3], 'Порядковый номер заявки', 1)[0] )
+                                        #print(len(tables))
+                                        #print(find_index_by_str(tables[3], 'Порядковый номер заявки', 1)[0] )
                                         winners_df = tables[0]  # Берем первую таблицу и редактируем
                                         winners_df.columns = winners_df.iloc[0]
                                         winners_df = winners_df.iloc[1:]
@@ -428,7 +428,7 @@ def get_protocols(login_sql, password_sql, isDebug=True, isProxy=True, args=None
                                     isnotdone = False
 
                                 print(winners_df)
-                                sys.exit()
+                                #sys.exit()
 
 
                                 if winners_df is not None:
