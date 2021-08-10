@@ -148,6 +148,8 @@ def get_protocols(login_sql, password_sql, isDebug=True, isProxy=True, args=None
                 t = f.read().split('\r\n')
                 ' '.join(t)
                 df_tenders_query1 = t[0].replace('\n', ' ')
+                print(df_tenders_query1)
+                print(reg_site_id0)
 
                 if "where" in df_tenders_query1:
                     df_tenders_query1 = df_tenders_query1 + " and RegSite_ID=" + reg_site_id0
@@ -157,6 +159,7 @@ def get_protocols(login_sql, password_sql, isDebug=True, isProxy=True, args=None
         else:
             print(args)
             df_tenders_query1 = "SELECT rc.*, W.Referer, W.descr, W.Version FROM [CursorImport].[import].[RegionalCommon] rc left join [CursorImport].[import].[RegionalWebsites] W on rc.RegSite_ID=W.ID where Local_Notif_ID in " + str(args).replace('[','(').replace(']',')')
+        #print(df_tenders_query1)
         df_tenders = parser_utils.select_query(df_tenders_query1, login_sql, password_sql, 'CursorImport')
         #print(df_tenders)
         #sys.exit()
@@ -174,15 +177,18 @@ def get_protocols(login_sql, password_sql, isDebug=True, isProxy=True, args=None
             site = df_tenders['descr'][0]
             version = df_tenders['Version'][0]
             # site_id = df_tenders['id'][i]
-            print('Сейчас обрабатывается: ', site)
+            if args == None:
+                print('Сейчас обрабатывается: ', site)
 
             for id0, row in df_tenders.iterrows():
 
                 #Взять настройки сайта
-                #referer = row['Referer']
-                #site = row['descr']
-                #site_id = row['RegSite_ID']
-                #version = row['Version']
+                if args != None:
+                    referer = row['Referer']
+                    site = row['descr']
+                    site_id = row['RegSite_ID']
+                    version = row['Version']
+                    print('Сейчас обрабатывается: ', site)
 
                 #print('Сейчас обрабатывается: ', site)
                 print(site, ':', id0, '/', len(df_tenders))
@@ -336,14 +342,14 @@ def get_protocols(login_sql, password_sql, isDebug=True, isProxy=True, args=None
                                             if ' url:' in spl.lower():
                                                 urls.append(spl.lower())
 
-                                #print(files)
-                                #print(urls)
+                                print(files)
+                                print(urls)
                                 #sys.exit()
 
                                 Found = False
                                 isrtf = False
                                 for url, file in zip(urls, files):
-                                    if 'протокол' in file.lower():  # Находим файлы протоколов
+                                    if 'протокол' in file.lower() or 'езультаты_закупки' in file.lower():  # Находим файлы протоколов
                                         url_download = url.split("url: '")[1].replace(' ', '').replace("'", "")
                                         r_download = requests.get(url_download, headers=headers, verify=False)
                                         with open('0.docx', 'wb') as f:  # Скачиваем документ
@@ -386,6 +392,8 @@ def get_protocols(login_sql, password_sql, isDebug=True, isProxy=True, args=None
                                         winners_df.columns = winners_df.iloc[0]
                                         winners_df = winners_df.iloc[1:]
                                         winners_df = winners_df.reset_index(drop=True)
+                                        #print(winners_df)
+                                        #print(isrtf)
                                         if isrtf == True:  # Сохраняет docx он криво, поэтому дополнительно исправляем
                                             # winners_df = winners_df.drop([0])
                                             ind0 = find_index_by_str(winners_df, 'Порядковый номер заявки', 1)[
