@@ -105,7 +105,7 @@ def load_to_base(login_sql, password_sql, isDebug=True):
         cursor.execute(
             "insert into [Cursor].[dbo].[Tender](ProcDt, PublDt, SrcInf, NotifNr, TendNr, StatusT_ID, FormT_ID, Reg_ID, ProviderT_ID, TenderDocReglament, Cust_ID, ClaimReglament, ClaimDtBeg, ClaimDtEnd, TendDt, TendNm, TenderPrice, Lot, ContrPrice, ContrPriceMax, PaymentReglament, ObespPerc, ObespSum, IsDraft, SYSDATE, LotCount, SpecCount, ImportType, isAutomate, UserID, OwnerID, Budget, BudgetProg_FK, Planned, FZ_ID) "
             "values (getdate(), ?, ?, ?, 'Б/н', ?, ?, ?, ?, 'Средства учреждений', ?, 'rts-tender.ru', ?, ?, ?, ?, ?, '1', 0.0, 0.0, ?, 0.0, 0.0, 0, getdate(), 1, 0, 18, 1, 'FDA506B0-2F4C-49F4-864F-836731C63391', 'FDA506B0-2F4C-49F4-864F-836731C63391', 'U', 7, 0, ?) ",
-            publdt, url, notifnr, int(statusid), auction_type, int(regid), cust_id, cust_id, tenddt, tendtend, tenddt,
+            publdt, url, notifnr, int(statusid), auction_type, int(regid), cust_id, cust_id, tenddt, tendtend, tendtend, #tenddt, #STEEL от 10.08.2021 дата проведения - это "Дата окончания подачи предложений:" с сайта
             tendnm, tenderprice, condition, fz_id)
         if isDebug == False:
             conn.commit()
