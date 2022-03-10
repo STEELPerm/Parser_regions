@@ -8,8 +8,10 @@ import datetime as dt
 import traceback
 from docx import Document
 import comtypes.client
+import win32com.client
 
 import parser_utils
+import re
 
 def clear_winword_process():
     try:
@@ -125,6 +127,97 @@ def FileSaveT():
                 print('Не удалось открыть файл протоколов')
                 traceback.print_exc()
                 clear_winword_process()
+
+def ConvertRtfToDocx(rootDir, file):
+    word = win32com.client.Dispatch("Word.Application")
+    wdFormatDocumentDefault = 16
+    wdHeaderFooterPrimary = 1
+    doc = word.Documents.Open(rootDir + "\\" + file)
+    for pic in doc.InlineShapes:
+        pic.LinkFormat.SavePictureWithDocument = True
+    for hPic in doc.sections(1).headers(wdHeaderFooterPrimary).Range.InlineShapes:
+        hPic.LinkFormat.SavePictureWithDocument = True
+    doc.SaveAs(str(rootDir + "\\refman.docx"), FileFormat=wdFormatDocumentDefault)
+    doc.Close()
+    word.Quit()
+
+def change_word_format(file_path):
+    word = win32com.client.Dispatch('Word.Application')
+
+    doc = word.Documents.Open(file_path)
+
+    doc.Activate()
+
+    # Rename path with .doc
+    new_file_abs = os.path.abspath(file_path)
+    new_file_abs = re.sub(r'\.\w+$', '.doc', new_file_abs)
+
+    # Save and Close
+    word.ActiveDocument.SaveAs(
+        new_file_abs, FileFormat=constants.wdFormatDocument
+    )
+    doc.Close(False)
+
+
+
+path ="C:\\Python\\!Vlad\\Parser_regions\\"
+
+#ConvertRtfToDocx(path,'0.rtf')
+#change_word_format(path+'0.rtf')
+
+price_string='47 145,50 руб., без НДС'
+print(price_string, price_string.count(','))
+
+
+price_fin = price_string.lower().split(' руб')[0].replace(' ','').replace(',','.')
+if price_fin.count('.')>=2:
+ price_fin = price_fin.split('.')[0]
+
+print(price_fin)
+print('Good')
+print(parser_utils.is_number(price_fin))
+time.sleep(30)
+#doc = aw.Document("0.rtf")
+#doc.save("0.docx")
+
+
+# pythoncom.CoInitializeEx(pythoncom.COINIT_APARTMENTTHREADED)
+# myWord = win32com.client.DispatchEx('Word.Application')
+# myDoc = myWord.Documents.Open(path, False, False, True)
+print(os.path.exists(path))
+
+#doc_ex = os.path.join(path, "0.rtf")
+#doc_ex = os.path.join('C:', os.sep, 'Python', '!Vlad', 'Parser_regions', "0.rtf")
+
+#print(doc_ex)
+os.system("taskkill /f /im WINWORD.EXE")
+time.sleep(10)
+
+word = win32com.client.Dispatch('Word.Application')
+print(type(word))
+doc = word.Documents(path + '0.rtf')
+
+
+print('Good')
+time.sleep(30)
+
+#word = win32com.client.Dispatch('Word.Application')
+#doc = word.Documents.Open(path + '0.rtf')
+#doc.SaveAs(path + '0.docx', FileFormat=16)
+
+word = win32.Dispatch ('Word.Application')
+#doc =word.Documents.Open(path + '0.rtf')
+print(type(word))
+
+
+# path = r'C:\Python\!Vlad\Parser_regions\0.rtf'
+# doc = word.Documents.Open(FileName=path, Encoding='gbk')
+
+print('Good')
+time.sleep(30)
+
+#new_file_abs = os.path.abspath(path + '0.rtf')
+#new_file_abs = re.sub(r'\.\w+$', '.doc', new_file_abs)
 
 
 

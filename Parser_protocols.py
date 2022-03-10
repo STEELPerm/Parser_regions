@@ -9,6 +9,8 @@ import datetime as dt
 import traceback
 from docx import Document
 import comtypes.client
+import re
+#import win32com.client
 # lxml
 pd.set_option('display.max_columns', 50)
 pd.set_option('display.width', 1000)
@@ -18,7 +20,7 @@ import parser_utils
 def clear_winword_process():
     try:
         os.system("taskkill /f /im WINWORD.EXE")
-        time.sleep(15)
+        time.sleep(5)
     except:
         pass
 
@@ -48,27 +50,83 @@ def find_org_in_base(org_string, login_sql, password_sql):  # Функция н�
     string_edited = org_string.replace('  ', ' ').replace('- ', '-').replace(' -.', '').replace(' -', '-').replace(' - ', '-')\
         .replace('" ', '"')
     string_edited2 = string_edited.replace('"', '')
-    string_edited3 = string_edited.replace('общество с ограниченной ответственностью ', '').replace('огуп ', 'областное государственное унитарное предприятие ')
+    string_edited3 = string_edited.replace('общество с ограниченной ответственностью ', '').replace('огуп ', 'областное государственное унитарное предприятие ').replace('общество с огранниченной ответственностью ', '')
+
+    string_edited3_1 = string_edited.replace('общество с ограниченной ответственностью', '')
+    string_edited4 = string_edited.replace('общество с ограниченной ответственностью ', '').replace('общество с огранниченной ответственностью ', '').replace('"', '')
+    string_edited5 = string_edited.replace('открытое акционерное общество ', '').replace('"', '')
+    string_edited6 = string_edited.replace('закрытое акционерное общество ', '').replace('"', '')
+    string_edited7 = string_edited.replace('казенное ', '').replace('"', '')
+    string_edited8 = string_edited.replace('акционерное общество ', '').replace('"', '')
+    string_edited9 = string_edited.replace(' ч.', '').replace('ч', '')
+    string_edited10 = string_edited.replace('ооо ', '').replace('ООО ', '').replace('оoo', '').replace('ooo','').replace('ЗАО ', '').replace('зао ', '')
+    string_edited11 = string_edited.replace(' ооо', '').replace(' ООО', '')
+
     # print(org_string, string_edited, string_edited2, string_edited3)
     # Этот метод хуже для базы, но в разы быстрее итерации через список
-    org_query2 = "SELECT DISTINCT Org_ID, INN, KPP from [Cursor].[dbo].Org where OrgNm like '%" + org_string + "%' or OrgNmS like '%" + org_string + "%'"
+    org_query2 = "SELECT Org_ID, INN, KPP from [Cursor].[dbo].Org where OrgNm like '%" + org_string + "%' or OrgNmS like '%" + org_string + "%' order by isnull(isZakupki,0) desc"
     df_org2 = parser_utils.select_query(org_query2, login_sql, password_sql)
 
     if df_org2.empty == True:
-        org_query2_1 = "SELECT DISTINCT Org_ID, INN, KPP from [Cursor].[dbo].Org where OrgNm like '%" + string_edited + "%' or OrgNmS like '%" + string_edited + "%'"
+        org_query2_1 = "SELECT Org_ID, INN, KPP from [Cursor].[dbo].Org where OrgNm like '%" + string_edited + "%' or OrgNmS like '%" + string_edited + "%' order by isnull(isZakupki,0) desc"
         df_org2 = parser_utils.select_query(org_query2_1, login_sql, password_sql)
 
     if df_org2.empty == True:  # Ищем по второму едиту
-        org_query3 = "SELECT DISTINCT Org_ID, INN, KPP from [Cursor].[dbo].Org where OrgNm like '%" + string_edited2 + "%' or OrgNmS like '%" + string_edited2 + "%'"
+        org_query3 = "SELECT Org_ID, INN, KPP from [Cursor].[dbo].Org where OrgNm like '%" + string_edited2 + "%' or OrgNmS like '%" + string_edited2 + "%' order by isnull(isZakupki,0) desc"
         df_org2 = parser_utils.select_query(org_query3, login_sql, password_sql)
 
     if df_org2.empty == True:  # Ищем после отбрасывания орг структуры
-        org_query3 = "SELECT DISTINCT Org_ID, INN, KPP from [Cursor].[dbo].Org where OrgNm like '%" + string_edited3 + "%' or OrgNmS like '%" + string_edited3 + "%'"
+        org_query3 = "SELECT Org_ID, INN, KPP from [Cursor].[dbo].Org where OrgNm like '%" + string_edited3 + "%' or OrgNmS like '%" + string_edited3 + "%' order by isnull(isZakupki,0) desc"
         df_org2 = parser_utils.select_query(org_query3, login_sql, password_sql)
 
     if df_org2.empty == True:  # Ищем по сокращенному имени, если это ИП
-        org_query4 = "SELECT DISTINCT Org_ID, INN, KPP from [Cursor].[dbo].Org where OrgNmSS like '%" + string_edited + "%'"
+        org_query4 = "SELECT Org_ID, INN, KPP from [Cursor].[dbo].Org where OrgNmSS like '%" + string_edited + "%' order by isnull(isZakupki,0) desc"
         df_org2 = parser_utils.select_query(org_query4, login_sql, password_sql)
+
+    if df_org2.empty == True:  # Ищем после отбрасывания орг структуры
+        org_query3 = "SELECT Org_ID, INN, KPP from [Cursor].[dbo].Org where OrgNm like '%" + string_edited3.replace(' ', '') + "%' or OrgNmS like '%" + string_edited3 + "%' order by isnull(isZakupki,0) desc"
+        df_org2 = parser_utils.select_query(org_query3, login_sql, password_sql)
+
+    if df_org2.empty == True:  # Ищем после отбрасывания орг структуры и кавычек
+        #print('Org:'+string_edited4+'End')
+        org_query3 = "SELECT Org_ID, INN, KPP from [Cursor].[dbo].Org where replace(orgNm,'\"','') like '%" + "'+RTRIM('"+string_edited4 + "')+'%' or OrgNmS like '%" + string_edited4 + "%' order by isnull(isZakupki,0) desc"
+        df_org2 = parser_utils.select_query(org_query3, login_sql, password_sql)
+
+    if df_org2.empty == True:  # Ищем после отбрасывания орг структуры ОАО
+        org_query3 = "SELECT Org_ID, INN, KPP from [Cursor].[dbo].Org where replace(orgNm,'\"','') like '%" + "'+RTRIM('"+string_edited5 + "')+'%' or OrgNmS like '%" + string_edited5 + "%' order by isnull(isZakupki,0) desc"
+        df_org2 = parser_utils.select_query(org_query3, login_sql, password_sql)
+
+    if df_org2.empty == True:  # Ищем после отбрасывания орг структуры ЗАО
+        org_query3 = "SELECT Org_ID, INN, KPP from [Cursor].[dbo].Org where replace(orgNm,'\"','') like '%" + "'+RTRIM('"+string_edited6 + "')+'%' or OrgNmS like '%" + string_edited6 + "%' order by isnull(isZakupki,0) desc"
+        df_org2 = parser_utils.select_query(org_query3, login_sql, password_sql)
+
+    if df_org2.empty == True:  # Ищем после отбрасывания "казенное"
+        org_query3 = "SELECT Org_ID, INN, KPP from [Cursor].[dbo].Org where replace(orgNm,'\"','') like '%" + string_edited7 + "%' or OrgNmS like '%" + string_edited7 + "%' order by isnull(isZakupki,0) desc"
+        df_org2 = parser_utils.select_query(org_query3, login_sql, password_sql)
+
+    if df_org2.empty == True:  # Ищем по сокращенному имени, если это ИП
+        org_query4 = "SELECT Org_ID, INN, KPP from [Cursor].[dbo].Org where OrgNmSS like '%" + string_edited.replace('ё', 'е') + "%' or OrgNmS like '%" + string_edited.replace('ё', 'е') + "%' order by isnull(isZakupki,0) desc"
+        df_org2 = parser_utils.select_query(org_query4, login_sql, password_sql)
+
+    if df_org2.empty == True:  # Ищем после отбрасывания орг структуры АО
+        org_query3 = "SELECT Org_ID, INN, KPP from [Cursor].[dbo].Org where replace(orgNm,'\"','') like '%" + "'+RTRIM('"+string_edited8 + "')+'%' or OrgNmS like '%" + string_edited8 + "%' order by isnull(isZakupki,0) desc"
+        df_org2 = parser_utils.select_query(org_query3, login_sql, password_sql)
+
+    if df_org2.empty == True:  # Ищем по сокращенному имени, если это ИП
+        org_query4 = "SELECT Org_ID, INN, KPP from [Cursor].[dbo].Org where OrgNmSS like '%" + string_edited9.replace('ё', 'е') + "%' or OrgNmS like '%" + string_edited9.replace('ё', 'е') + "%' order by isnull(isZakupki,0) desc"
+        df_org2 = parser_utils.select_query(org_query4, login_sql, password_sql)
+
+    if df_org2.empty == True:  # Ищем после отбрасывания орг структуры
+        org_query3 = "SELECT Org_ID, INN, KPP from [Cursor].[dbo].Org where OrgNm like '%" + string_edited10 + "%' or OrgNmS like '%" + string_edited10 + "%' order by isnull(isZakupki,0) desc"
+        df_org2 = parser_utils.select_query(org_query3, login_sql, password_sql)
+
+    if df_org2.empty == True:  # Ищем после отбрасывания орг структуры
+        org_query3 = "SELECT Org_ID, INN, KPP from [Cursor].[dbo].Org where OrgNm like '%" + string_edited3_1 + "%' or OrgNmS like '%" + string_edited3_1 + "%' order by isnull(isZakupki,0) desc"
+        df_org2 = parser_utils.select_query(org_query3, login_sql, password_sql)
+
+    if df_org2.empty == True:  # Ищем после отбрасывания орг структуры
+        org_query3 = "SELECT Org_ID, INN, KPP from [Cursor].[dbo].Org where OrgNm like '%" + string_edited11 + "%' or OrgNmS like '%" + string_edited11 + "%' order by isnull(isZakupki,0) desc"
+        df_org2 = parser_utils.select_query(org_query3, login_sql, password_sql)
 
     if df_org2.empty == False:  # Если нашли - заменяем None
         print(org_string)
@@ -107,11 +165,23 @@ def insert_prots_query(notif_id0, notif0, why_not0, main_stat0, prot_num0, orgnm
     conn.close()
 
 def price_cleaner(price_string):
-    price_fin = price_string.lower().split(' руб')[0].replace(' ','').split(',')[0]
+
+    # STEEL от 05.03.2022 чтобы копейки не обрезались
+    price_fin = price_string.lower().split(' руб')[0].replace(' ', '').replace(',', '.')
+
+    if price_fin.count('.') >= 2:
+        price_fin = price_fin.split('.')[0]
+
     if parser_utils.is_number(price_fin) == False:
-        price_fin = price_string.split(' (')[0].replace(' ','').split(',')[0]
+        price_fin = price_string.split(' (')[0].replace(' ', '').split(',')[0]
         if parser_utils.is_number(price_fin) == False:
             price_fin = None
+
+    # price_fin = price_string.lower().split(' руб')[0].replace(' ','').split(',')[0]
+    # if parser_utils.is_number(price_fin) == False:
+    #     price_fin = price_string.split(' (')[0].replace(' ','').split(',')[0]
+    #     if parser_utils.is_number(price_fin) == False:
+    #         price_fin = None
     return price_fin
 
 def get_protocols(login_sql, password_sql, isDebug=True, isProxy=True, args=None):
@@ -228,7 +298,7 @@ def get_protocols(login_sql, password_sql, isDebug=True, isProxy=True, args=None
                             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.163 Safari/537.36'
                         }
                         print(url)
-                        time.sleep(2)
+                        time.sleep(1)
                         if isProxy == True:
                             try:
                                 r = requests.get(url, headers=headers, verify=False, proxies=proxies,
@@ -339,8 +409,13 @@ def get_protocols(login_sql, password_sql, isDebug=True, isProxy=True, args=None
                                         for spl in data2:  # Находим в строках соответствие
                                             if 'filename' in spl.lower():
                                                 files.append(spl.lower())
-                                            if ' url:' in spl.lower():
-                                                urls.append(spl.lower())
+                                            #STEEL от 05.03.2022 ссылка на файл начинается с 'url:'
+
+                                            if 'url:' in spl.lower():
+                                                if re.search('^url:', spl.lower()) != None:
+                                                #if 'url:' in spl.lower() and ('files/FileDownloadHandler' in spl.lower() or 'api/Upload' in spl.lower()):
+                                                #if ' url:' in spl.lower():
+                                                    urls.append(spl.lower())
 
                                 print(files)
                                 print(urls)
@@ -364,6 +439,19 @@ def get_protocols(login_sql, password_sql, isDebug=True, isProxy=True, args=None
                                         word = comtypes.client.CreateObject('Word.Application')
                                         doc = word.Documents.Open(path + '0.rtf')
                                         doc.SaveAs(path + '0.docx', FileFormat=wdFormatDOCX)
+
+
+                                        # try:
+                                        #     word = comtypes.client.CreateObject('Word.Application')
+                                        #     doc = word.Documents.Open(path + '0.rtf')
+                                        #     doc.SaveAs(path + '0.docx', FileFormat=wdFormatDOCX)
+                                        #
+                                        # except:
+                                        #     word = win32com.client.DispatchEx("Word.Application")
+                                        #     doc = word.Documents(path + '0.rtf')
+                                        #     doc.SaveAs(path + '0.docx', FileFormat=wdFormatDOCX)
+
+
                                         doc.Close()
                                         word.Quit()
                                         isrtf = True
@@ -396,6 +484,7 @@ def get_protocols(login_sql, password_sql, isDebug=True, isProxy=True, args=None
                                         #print(isrtf)
                                         if isrtf == True:  # Сохраняет docx он криво, поэтому дополнительно исправляем
                                             # winners_df = winners_df.drop([0])
+
                                             ind0 = find_index_by_str(winners_df, 'Порядковый номер заявки', 1)[
                                                 0]  # Находим строку с порядковым номером и берем индекс
                                             winners_df.columns = winners_df.iloc[
@@ -408,7 +497,7 @@ def get_protocols(login_sql, password_sql, isDebug=True, isProxy=True, args=None
                                             winners_df = winners_df[
                                                 winners_df.columns[1:]]  # Убираем первую "пустую" колонну
                                             winners_df = winners_df.reset_index(drop=True)
-                                            # print(winners_df);time.sleep(30)
+                                            #print(winners_df);time.sleep(30)
 
                                         clear_winword_process()
                                         os.remove('0.docx')

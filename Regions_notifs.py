@@ -406,11 +406,17 @@ def load_notifs_to_import(login_sql, password_sql, t2, isArgs=False, args_to_par
                                                 status_fin = None
 
                                         # Забираем заказчика из базы
+                                        #print(org_ID_cust, cust)
+                                        #sys.exit()
+                                        org_cust = None
+
                                         if org_ID_cust == None:
                                             if cust != None:
                                                 org_cust_query = "SELECT o.Org_ID from [Cursor].[dbo].[Org] o join [CursorImport].[import].[RegionalOrgs] ro on o.INN=ro.Customer_INN and o.KPP=ro.Customer_KPP where ro.Customer_ID = " + str(
                                                 cust)
                                                 org_cust = parser_utils.select_query(org_cust_query, login_sql, password_sql, 'Cursor')
+
+                                                org_cust = org_cust['Org_ID'][0]
                                             if cust != None and org_cust.empty == True:  # если не находим, згначит пытаемся загрузить новый орг в базу
                                                 org_inn_query = "SELECT [Customer_INN] from [CursorImport].[import].[RegionalOrgs] where Customer_ID = " + str(cust)
                                                 org_inn = parser_utils.select_query(org_inn_query, login_sql, password_sql, 'Cursor')['Customer_INN'][0].replace(' ', '')
@@ -420,9 +426,9 @@ def load_notifs_to_import(login_sql, password_sql, t2, isArgs=False, args_to_par
                                                     cust)
                                                 org_cust = parser_utils.select_query(org_cust_query, login_sql, password_sql, 'Cursor')
                                                 #org_cust = org_cust['Org_ID'][0]
-                                            org_cust = org_cust['Org_ID'][0]
+                                                org_cust = org_cust['Org_ID'][0]
 
-                                            #print(org_cust)
+                                            #print(org_cust, cust, cust_INN)
                                             #sys.exit()
 
                                             if cust == None and cust_INN != None:
@@ -808,7 +814,7 @@ def load_notifs_to_import(login_sql, password_sql, t2, isArgs=False, args_to_par
                     sys.exit()
                 except:
                     print('Подключение не удалось')
-                    #traceback.print_exc()
+                    traceback.print_exc()
                     try:
                         if notif not in loaded:  # Необходимо, если прокси слетает не завершив закачку
                             isnotdone = True
