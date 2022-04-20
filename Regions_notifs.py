@@ -15,13 +15,28 @@ import Org_creator
 
 def load_notifs_to_import(login_sql, password_sql, t2, isArgs=False, args_to_parse=None, isDebug=True, isProxy=True):
     # Достаем прокси
-    df_proxies = parser_utils.get_proxies(login_sql, password_sql)
+    if isProxy == True:
+        df_proxies = parser_utils.get_proxies(login_sql, password_sql)
+
+    # Проставить NotNeed = 1 у ненужных извещений (проверяется TendNm по чёрному списку слов)
+    conn = pyodbc.connect('Driver={SQL Server Native Client 11.0};'
+                          'Server=37.203.243.65\CURSORMAIN,49174;'
+                          'Database=CursorImport;'
+                          'UID=' + login_sql + ';'
+                          'PWD=' + password_sql + ';'
+                          'Trusted_Connection=no;')
+    cursor = conn.cursor()
+    cursor.execute("exec spRegion_RegionalCommon_setNotNeed")
+
+    if isDebug == False:
+        conn.commit()
+    conn.close()
+
 
     # Достаем инфу о сайтах
     reg_sites_query = "SELECT id, isnull(Version,1) as version FROM [CursorImport].[import].[RegionalWebsites]" #where Host = 'zmo-new-webapi.rts-tender.ru'
     df_reg_site = parser_utils.select_query(reg_sites_query, login_sql, password_sql)
 
-    # Забираем статусы из базы
     # Забираем статусы из базы
     status_query = "SELECT * FROM [Cursor].[dbo].[StatusT] where id != 0"
     df_status = parser_utils.select_query(status_query, login_sql, password_sql)
@@ -51,9 +66,9 @@ def load_notifs_to_import(login_sql, password_sql, t2, isArgs=False, args_to_par
                     proxies = {'http': 'http://' + prox, 'https': 'http://' + prox, }
                 try:
                     if isArgs == False:
-                        df_tenders_query1 = "SELECT rc.* FROM [CursorImport].[import].[RegionalCommon] rc left join [CursorImport].[import].Regional_Notif rn on rc.Local_Notif_ID=rn.NotifNr where rn.NotifNr is null and rc.PublDt >= '" + t2 + "' and rc.RegSite_ID = " + reg_site_id0
-                        #за 2021 год
-                        #df_tenders_query1 = "SELECT rc.* FROM [CursorImport].[import].[RegionalCommon] rc left join [CursorImport].[import].Regional_Notif rn on rc.Local_Notif_ID=rn.NotifNr where rn.NotifNr is null and rc.PublDt >= '20210320' and rc.RegSite_ID = " + reg_site_id0
+                        #df_tenders_query1 = "SELECT rc.* FROM [CursorImport].[import].[RegionalCommon] rc left join [CursorImport].[import].Regional_Notif rn on rc.Local_Notif_ID=rn.NotifNr where rn.NotifNr is null and rc.PublDt >= '" + t2 + "' and isnull(rc.NotNeed,0)=0 and rc.RegSite_ID = " + reg_site_id0
+                        #за 2022 год
+                        df_tenders_query1 = "SELECT rc.* FROM [CursorImport].[import].[RegionalCommon] rc left join [CursorImport].[import].Regional_Notif rn on rc.Local_Notif_ID=rn.NotifNr where rn.NotifNr is null and rc.PublDt >= '20220101' and isnull(rc.NotNeed,0)=0 and rc.RegSite_ID = " + reg_site_id0
                     else:
                         args = str(args_to_parse).replace('[', '').replace(']', '')
                         df_tenders_query1 = "SELECT * FROM [CursorImport].[import].[RegionalCommon]  where Local_Notif_ID in ("+args+") and RegSite_ID = " + reg_site_id0
@@ -375,7 +390,9 @@ def load_notifs_to_import(login_sql, password_sql, t2, isArgs=False, args_to_par
                                         if ',' or ' ' or ' ' in price:
                                           price = price.replace(",", ".").replace(" ", "").replace(" ", "")
                                         if parser_utils.is_number(price) == False:
-                                            price = None
+                                            #STEEL от 04.04.2022 Сделал =0, т.к. при вставке в базу: Conversion failed when converting the nvarchar value 'None' to data type int.
+                                            #price = None
+                                            price = 0
 
                                         # Определяем статус по базе
                                         status_list = []
@@ -461,8 +478,8 @@ def load_notifs_to_import(login_sql, password_sql, t2, isArgs=False, args_to_par
                                         except:
                                             pass
 
-                                        #print(str(tendNm), price, str(deliverPlace), reg_id_fin, str(tendStatus),status_fin, deliverDt)
-                                        #print(publDt, tendEnd, contractDt, url, str(notif), cust, str(org_cust),str(deliverDt), str(tendNm),
+                                        # print(price, str(tendNm), str(deliverPlace), reg_id_fin, str(tendStatus),status_fin, deliverDt)
+                                        # print(publDt, tendEnd, contractDt, url, str(notif), cust, str(org_cust),str(deliverDt), str(tendNm),
                                         #      price, payment, descr, str(site_id),uniqueId, fz_id)
                                         #sys.exit()
 
@@ -538,7 +555,7 @@ def load_notifs_to_import(login_sql, password_sql, t2, isArgs=False, args_to_par
                                         # LotSpecs
                                         if version == 1:
                                             for spec_id, spec in table3.iterrows():
-                                                prodNm = spec['Наименование товара, работ, услуг']
+                                                prodNm = str(spec['Наименование товара, работ, услуг'])
                                                 okpd_code = spec['Код классификатора'].split(' / ')[0]
                                                 ed_izm = spec['Единицы измерения']
                                                 try:
@@ -550,7 +567,8 @@ def load_notifs_to_import(login_sql, password_sql, t2, isArgs=False, args_to_par
                                                 try:
                                                     qty = int(spec['Количество'])
                                                 except:
-                                                    qty = None
+                                                    #qty = None
+                                                    qty = 0
 
                                                 # Тип продукта
                                                 prodtype = '-'
@@ -629,7 +647,7 @@ def load_notifs_to_import(login_sql, password_sql, t2, isArgs=False, args_to_par
                                                 form = prodNm
                                                 if prodNm != None:
                                                     prodNm = prodNm[:499]
-                                                # print(prodtype, str(prodNm), form, okpd_code, okpd_name, price_spec, str(qty), summ, str(ed_izm), ed_izm_base)
+                                                print(prodtype, str(prodNm), form, okpd_code, okpd_name, price_spec, str(qty), summ, str(ed_izm), ed_izm_base)
                                                 conn1 = pyodbc.connect('Driver={SQL Server Native Client 11.0};'
                                                                        'Server=37.203.243.65\CURSORMAIN,49174;'
                                                                        'Database=CursorImport;'

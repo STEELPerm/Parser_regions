@@ -4,6 +4,7 @@ import pyodbc
 import time
 import datetime
 import sys
+import random
 import traceback
 from bs4 import BeautifulSoup
 import urllib3
@@ -12,12 +13,27 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 import parser_utils
 
 def find_notifs(login_sql, password_sql, word_to_parse, date_to_parse, pages=None, isDebug=True, isProxy=True):
+
+    # STEEL от 28.03.2022 добавлена возможность парсить по заказчику. Например: Офтальм.
+    # Указать в words.txt: 'заказчик:Офтальм'. По умолчанию parse_customer = '' - это значит парсим по поисковым словам
+    parse_customer = ''
+    if 'заказчик:' in str(word_to_parse):
+        parse_customer = word_to_parse.split('заказчик:')[1]
+        print('Поисковое слово: ' + str(word_to_parse) + '. Обрезанное: ' + str(parse_customer))
+        if 'заказчик:' in str(parse_customer):
+            print('## Ошибка при формировании поискового запроса по заказчику')
+            sys.exit()
+
     # Достаем прокси
-    df_proxies = parser_utils.get_proxies(login_sql, password_sql)
+    if isProxy == True:
+        df_proxies = parser_utils.get_proxies(login_sql, password_sql)
 
     # Достаем инфу о сайтах
     reg_sites_query = "SELECT id, isnull(version,1) as version FROM [CursorImport].[import].[RegionalWebsites]" # where Host = 'zmo-new-webapi.rts-tender.ru'
     df_reg_site = parser_utils.select_query(reg_sites_query, login_sql, password_sql)
+
+    # счётчик извещений
+    i_count = 0
 
     for df_id, reg_site_id in df_reg_site.iterrows():
         reg_site_id0 = str(reg_site_id['id'])
@@ -27,7 +43,7 @@ def find_notifs(login_sql, password_sql, word_to_parse, date_to_parse, pages=Non
             while isnotdone == True:
                 # try:
                 #time.sleep(2)
-                time.sleep(1)
+                time.sleep(random.uniform(0.7, 1.7))
                 proxy = ''
                 print('Попытка №' + str(i + 1))
                 if isProxy == True:
@@ -64,12 +80,22 @@ def find_notifs(login_sql, password_sql, word_to_parse, date_to_parse, pages=Non
                                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.163 Safari/537.36'}
                     i0 = 1
                     TotalPages = 2
-                    while i0 < TotalPages + 1:
-                        payload = {"page": i0, "itemsPerPage": 50, "tradeName": str(word_to_parse),
-                                   "filterDateFrom": str(date_to_parse) + "T00:00:00.000Z", "UsedClassificatorType": 5,
-                                   "TradeSearchType": 50}
-                        time.sleep(2)
-                        #print(isProxy)
+                    bdcount = 0 # кол-во повторов извещений в базе
+                    i_totalrecords = 1 # счётчик извещений
+                    while i0 < TotalPages + 1 and bdcount <= 20:
+                        if parse_customer != '':
+                            payload = {"CustomerFullNameOrInn": str(parse_customer), "filterDateFrom": "2022-01-01T00:00:00.000Z",
+                                       "page": i0, "itemsPerPage": 50, "TradeSearchType": 50,
+                                       "UsedClassificatorType": 5, "UseCustomerInn": False, "UseCustomerName": True}
+
+                        else:
+                            payload = {"page": i0, "itemsPerPage": 50, "tradeName": str(word_to_parse),
+                                       "filterDateFrom": str(date_to_parse) + "T00:00:00.000Z", "UsedClassificatorType": 5,
+                                       "TradeSearchType": 50}
+                        #time.sleep(2)
+                        time.sleep(random.uniform(0.7, 2.7))
+                        #print(headers) print(payload) print(json.dumps(payload))
+
                         if isProxy == True:
                             try:
                                 r = requests.post(url, data=json.dumps(payload), headers=headers, verify=False,
@@ -87,8 +113,19 @@ def find_notifs(login_sql, password_sql, word_to_parse, date_to_parse, pages=Non
 
                         try:
                             if isError == False:
+                                print(r.status_code, url)
+
                                 r0 = r.json()
-                                print(r0, url)
+                                # print(r0, url)
+
+                                totalrecords = r0['totalrecords'] # всего извещений
+
+                                print('Всего извещений на странице: ' + str(totalrecords))
+
+                                # STEEL от 29.03.2022 Если нечего парсить, то сразу выходим из цикла 3х страниц
+                                if r0['totalpages'] == 0:
+                                    i0 = TotalPages + 1
+
                                 if pages == None:
                                     if r0['totalpages'] > TotalPages:  # Достаем полный объем страниц и заменяем выше заданную переменную
                                         TotalPages = r0['totalpages']
@@ -100,8 +137,10 @@ def find_notifs(login_sql, password_sql, word_to_parse, date_to_parse, pages=Non
                                 for data in r0['invdata']:
                                     reg_site_id = reg_site_id0
                                     local_notif_id = str(data['Id'])
+                                    url_tender = referer + 'Trade/ViewTrade?id=' + str(local_notif_id)
                                     status = str(data['TradeStateName'])
                                     publdt = str(data['PublicationDate'])
+                                    tendnm = str(data['TradeName'])
                                     try:
                                         apps = str(data['CountApplications'])
                                     except:
@@ -200,13 +239,15 @@ def find_notifs(login_sql, password_sql, word_to_parse, date_to_parse, pages=Non
                                         except:
                                             pass
                                             # customer_id = None
-                                            print('Ошибка при распарсивании организации со страницы: ') + url1
+                                            print('Ошибка при распарсивании организации со страницы: ' + url1)
                                             isnotdone = False
                                             isError = True
                                             traceback.print_exc()
                                             # sys.exit()
 
                                         print('Закачиваем извещение с ID: ', local_notif_id)
+                                        i_count += 1
+
                                         conn = pyodbc.connect('Driver={SQL Server Native Client 11.0};'
                                                               'Server=37.203.243.65\CURSORMAIN,49174;'
                                                               'Database=CursorImport;'
@@ -215,14 +256,23 @@ def find_notifs(login_sql, password_sql, word_to_parse, date_to_parse, pages=Non
                                                               'Trusted_Connection=no;')
                                         cursor = conn.cursor()
                                         cursor.execute(
-                                            "insert into [CursorImport].[import].[RegionalCommon]([RegSite_ID], [Local_Notif_ID], [Status], [PublDt], [CountApplications], [Customer_ID], [SYSDATE], [isImported], [Customer_INN], [Customer_Name], [Customer_Addr]) "
-                                            "values (?, ?, ?, ?, ?, ?, GETDATE(), '0', ?, ?, ?) ",
-                                            reg_site_id, local_notif_id, status, publdt, apps, customer_id, org_inn, org_name, org_addr)
+                                            "insert into [CursorImport].[import].[RegionalCommon]([RegSite_ID], [Local_Notif_ID], [Status], [PublDt], [CountApplications], [Customer_ID], [SYSDATE], [isImported], [Customer_INN], [Customer_Name], [Customer_Addr], [TendNm], [Url]) "
+                                            "values (?, ?, ?, ?, ?, ?, GETDATE(), '0', ?, ?, ?, ?, ?) ",
+                                            reg_site_id, local_notif_id, status, publdt, apps, customer_id, org_inn, org_name, org_addr, tendnm, url_tender)
                                         if isDebug == False:
                                             conn.commit()
                                         conn.close()
                                     else:
                                         print('Извещение ', local_notif_id, ' есть в базе')
+                                        bdcount += 1
+
+                                        if bdcount > 20:
+                                            #print('Переходим к другому поисковому слову')
+                                            i0 = TotalPages + 1
+                                    i_totalrecords += 1
+
+                                if i_totalrecords >= totalrecords:
+                                    i0 = TotalPages + 1
 
                                 i0 += 1
                             else:
@@ -230,6 +280,7 @@ def find_notifs(login_sql, password_sql, word_to_parse, date_to_parse, pages=Non
                                 break
                         except:
                             print('Ошибка при работе с json')
+                            traceback.print_exc()
                             isnotdone = False
                             isError = True
                             i0 = TotalPages + 1
@@ -240,3 +291,6 @@ def find_notifs(login_sql, password_sql, word_to_parse, date_to_parse, pages=Non
                     traceback.print_exc()
                     if isDebug == True:
                         traceback.print_exc()
+
+    print('Необходимо скачать: ' + str(i_count))
+    return i_count

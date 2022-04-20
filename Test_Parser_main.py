@@ -12,6 +12,8 @@ import win32com.client
 
 import parser_utils
 import re
+import Test_Get_KPP
+import sys
 
 def clear_winword_process():
     try:
@@ -158,6 +160,14 @@ def change_word_format(file_path):
     )
     doc.Close(False)
 
+
+#global G
+G = 500
+PEREMEN = Test_Get_KPP.A()
+print('PEREMEN', PEREMEN)
+
+print(G)
+sys.exit()
 
 
 path ="C:\\Python\\!Vlad\\Parser_regions\\"

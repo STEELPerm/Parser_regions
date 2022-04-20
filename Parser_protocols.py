@@ -191,7 +191,7 @@ def get_protocols(login_sql, password_sql, isDebug=True, isProxy=True, args=None
         df_proxy = parser_utils.get_proxies(login_sql, password_sql)
         print(df_proxy.sample(1))
     if args == None:
-        reg_sites_query = "SELECT id FROM [CursorImport].[import].[RegionalWebsites] where Host = 'zmo-new-webapi.rts-tender.ru'" # where Host = 'zmo-new-webapi.rts-tender.ru'
+        reg_sites_query = "SELECT id FROM [CursorImport].[import].[RegionalWebsites]" # where Host = 'zmo-new-webapi.rts-tender.ru'
     else:
         reg_sites_query = "SELECT TOP(1) id FROM [CursorImport].[import].[RegionalWebsites] where Host = 'zmo-new-webapi.rts-tender.ru'"
     df_reg_site = parser_utils.select_query(reg_sites_query, login_sql, password_sql)
@@ -225,6 +225,7 @@ def get_protocols(login_sql, password_sql, isDebug=True, isProxy=True, args=None
                     df_tenders_query1 = df_tenders_query1 + " and RegSite_ID=" + reg_site_id0
                 else:
                     df_tenders_query1 = df_tenders_query1 + " where RegSite_ID=" + reg_site_id0
+
             # df_tenders_query1 = "SELECT rc.* FROM [CursorImport].[import].[RegionalCommon] rc join [CursorImport].[import].Regional_Notif rn on rc.Local_Notif_ID=rn.NotifNr join [Cursor].dbo.Tender t on rn.NotifNr=t.NotifNr join [Cursor].dbo.Lot l on t.Tender_ID=l.Tender_ID where TypeReasonFail_ID is null and Winner_ID is null and rc.RegSite_ID = " + reg_site_id0
         else:
             print(args)
@@ -319,7 +320,15 @@ def get_protocols(login_sql, password_sql, isDebug=True, isProxy=True, args=None
                                 except:
                                     table1 = pd.read_html(r.text)[2]  # Тендер
                                 # table3.to_excel('test_pos1.xlsx');print(table2);time.sleep(60)
-                                # print(table1);print(len(table1))
+                                # print(table1);print(len(table1));print(table1[0]);print ('INN=('+table1[0][1]+')')
+
+                                # STEEL от 15.04.2022 Если во второй таблице Заказчик (содержит 3 поля:  Полное наименование, ИНН, Адрес места нахождения), то берём 3ю таблицу
+                                for st in range(len(table1)):
+                                    if table1[0][st] == 'ИНН':
+                                        try:
+                                            table1 = pd.read_html(r.text)[2]
+                                        except:
+                                            pass
 
                                 tendStatus = None
                                 if tendStatus == None:
@@ -507,7 +516,7 @@ def get_protocols(login_sql, password_sql, isDebug=True, isProxy=True, args=None
                                         traceback.print_exc()
                                         clear_winword_process()
 
-                                if Found == False and 'заверш' not in tendStatus.lower():
+                                if Found == False and 'заверш' not in tendStatus.lower() and 'договор заключен' not in tendStatus.lower():
                                     prot_num = 0
                                     why_not = "Документ протокола не найден. " + tendStatus
                                     main_stat = 'ПРОТОКОЛ НЕДОСТУПЕН'
@@ -515,13 +524,13 @@ def get_protocols(login_sql, password_sql, isDebug=True, isProxy=True, args=None
                                                        Winner_price, Winner_decision, login_sql, password_sql, Debug=isDebug)
                                     print('Документ протокола не найден')
                                     isnotdone = False
-                                if Found == False and 'заверш' in tendStatus.lower():
+                                if Found == False and ('заверш' in tendStatus.lower() or 'договор заключен' in tendStatus.lower()):
                                     prot_num = 0
                                     why_not = "Закупка завершена, но документ отсутствует"
                                     main_stat = 'ПРОТОКОЛ НЕДОСТУПЕН'
                                     insert_prots_query(notif_id, notif, why_not, main_stat, prot_num, Winner, Winner_ID,
                                                        Winner_price, Winner_decision, login_sql, password_sql, Debug=isDebug)
-                                    print('Документ протокола не найден')
+                                    print('Документ протокола не найден ' + tendStatus)
                                     isnotdone = False
 
                                 print(winners_df)

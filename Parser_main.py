@@ -55,6 +55,7 @@ if __name__ == '__main__':
     mails = parser_utils.get_list_from_txt(mails_file)
     words_to_parse = parser_utils.get_list_from_txt(words_file)
 
+    #if 1==2:
     if len(sys.argv) > 1:  # Достаем номера через консоль (если они были даны)
         if str(sys.argv[1]).lower() == 'n':  # Если извещения
             print('Парсим номера извещений')
@@ -91,13 +92,15 @@ if __name__ == '__main__':
             word = word.replace('?', '')
             pages_to_search = 3  # Страниц для поиска, иначе даже при установлении даты он качает всё.
             print(word)
-            Regions_initial.find_notifs(login_sql, password_sql, word, yesterday, pages=pages_to_search, isDebug=Debug, isProxy=Proxy)
-            Regions_orgs.load_orgs(login_sql, password_sql, isDebug=Debug, isProxy=Proxy)
-            Regions_notifs.load_notifs_to_import(login_sql, password_sql, yesterday, isDebug=Debug, isProxy=Proxy)
+            # COUNT = 0  # счётчик извещений
+            COUNT = Regions_initial.find_notifs(login_sql, password_sql, word, yesterday, pages=pages_to_search, isDebug=Debug, isProxy=Proxy)
+            if COUNT > 0:  # если скачали хоть одно
+                Regions_orgs.load_orgs(login_sql, password_sql, isDebug=Debug, isProxy=Proxy)
+                Regions_notifs.load_notifs_to_import(login_sql, password_sql, yesterday, isDebug=Debug, isProxy=Proxy)
 
-            #print('TYT2')
             #sys.exit()
 
+    #Regions_notifs.load_notifs_to_import(login_sql, password_sql, yesterday, isDebug=Debug, isProxy=Proxy)
     Notifs_2_base.load_to_base(login_sql, password_sql, isDebug=Debug)
 
     # Отправка статистики и отчетов

@@ -23,9 +23,20 @@ def get_KPP(query):
     ln = len(r0['suggestions'])
     #print(ln)
 
+def A ():
+    G = 1000
+    print('XRU')
+    return G
 
 #get_KPP('5610048595')
 
-tenddt = '11.03.2021'
+#tenddt = '11.03.2021'
 
-print(tenddt)
+#print(tenddt)
+
+#global G
+# if __name__ == '__main__':
+#     k = A()
+#
+# print(k)
+
