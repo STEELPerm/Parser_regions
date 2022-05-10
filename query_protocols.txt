@@ -1,9 +1,0 @@
-SELECT rc.*, W.Referer, W.descr, W.Version
-FROM [CursorImport].[import].[RegionalCommon] rc
-join [CursorImport].[import].Regional_Notif rn on rc.Local_Notif_ID=rn.NotifNr
-join [Cursor].dbo.Tender t on rn.NotifNr=t.NotifNr
-join [Cursor].dbo.Lot l on t.Tender_ID=l.Tender_ID
-left join [CursorImport].[import].[RegionalWebsites] W on rc.RegSite_ID=W.ID
-where L.TypeReasonFail_ID is null and L.Winner_ID is null and t.PublDt > cast(dateadd(MM, -6, getdate()) as date)
-and ((RegSite_ID != 777 and isnull(L.LotStatus, 0) not in (5)) or (RegSite_ID = 777 and isnull(L.LotStatus, 0) = 6))
-and exists (select 1 from [Cursor].dbo.LotSpec (nolock) where Lot_ID=L.Lot_ID)
